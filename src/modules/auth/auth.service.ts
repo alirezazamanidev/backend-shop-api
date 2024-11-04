@@ -2,9 +2,10 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from '../user/entities/user.entity';
 import { Repository } from 'typeorm';
-import { SendOtpDto } from './dtos/auth.dto';
+import { CheckOtpDto, SendOtpDto } from './dtos/auth.dto';
 import { RedisService } from '../redis/redis.service';
 import { randomInt } from 'crypto';
+import { TokenService } from './token.service';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +13,7 @@ export class AuthService {
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly redisService: RedisService,
+    private readonly tokenService: TokenService,
   ) {}
 
   async sendOtp(userDto: SendOtpDto) {
@@ -42,5 +44,27 @@ export class AuthService {
       process.env.OTP_TIME_EXPIRED,
     );
     return code;
+  }
+  async checkOtp(userDto: CheckOtpDto) {
+    let { phone, code } = userDto;
+    // check otp
+    const otpCode = await this.redisService.get(`otp:${phone}`);
+    if (!otpCode)
+      throw new UnauthorizedException('The Otp Code has beeen expired!');
+    if (otpCode !== code)
+      throw new UnauthorizedException('The Otp code is Incorect!');
+    // create jwt tokens
+    let tokens = await this.tokenService.generateJWTTokens(phone);
+    // set black list
+    await this.redisService.set(
+      `rt_token:${phone}`,
+      tokens.refresh_token,
+      process.env.REFRESH_TOKEN_TIME_EXPIRED,
+    );
+
+    return {
+      message: 'LoggedIn successFully',
+      tokens,
+    };
   }
 }

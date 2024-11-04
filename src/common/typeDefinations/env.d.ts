@@ -15,5 +15,9 @@ declare namespace NodeJS {
     // Redis
     REDIS_PORT: number;
     REDIS_HOST: string;
+    // Secrets
+    REFRESH_TOKEN_JWT:string
+    ACCESS_TOKEN_JWT:string
+    REFRESH_TOKEN_TIME_EXPIRED:number
   }
 }
