@@ -1,8 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+    IsJWT,
   IsMobilePhone,
   IsNotEmpty,
   IsNumberString,
+  IsString,
   Length,
 } from 'class-validator';
 
@@ -22,4 +24,11 @@ export class CheckOtpDto {
   @IsNumberString()
   @Length(5, 5)
   code: string;
+}
+export class RefreshTokenDto {
+    @ApiProperty()
+    @IsNotEmpty()
+    @IsString()
+    @IsJWT()
+    refresh_token:string
 }

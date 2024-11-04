@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Tokens } from './types/payload.type';
 
@@ -22,5 +22,15 @@ export class TokenService {
       access_token: at,
       refresh_token: rt,
     };
+  }
+   verifyRt(rt:string){
+    try {
+      return this.jwtService.verify(rt, {
+          secret: process.env.REFRESH_TOKEN_JWT,
+        });
+      } catch (err) {
+        throw new UnauthorizedException("Invalid refresh token");
+      }
+
   }
 }

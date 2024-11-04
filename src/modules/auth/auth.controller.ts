@@ -1,8 +1,9 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ApiConsumes, ApiOperation } from '@nestjs/swagger';
-import { CheckOtpDto, SendOtpDto } from './dtos/auth.dto';
+import { CheckOtpDto, RefreshTokenDto, SendOtpDto } from './dtos/auth.dto';
 import { ContentType } from 'src/common/enums';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -22,5 +23,14 @@ export class AuthController {
   @ApiConsumes(ContentType.URL_ENCODED, ContentType.JSON)
   checkOtp(@Body() userDto: CheckOtpDto) {
     return this.authService.checkOtp(userDto);
+  }
+
+  @ApiOperation({summary:'Get new access token with refresh token!'})
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh')
+  @ApiConsumes(ContentType.URL_ENCODED,ContentType.JSON)
+  @Throttle({default:{limit:1,ttl:300}}) 
+  refreshTokens(@Body() rtDTo:RefreshTokenDto){
+    return this.authService.refreshTokens(rtDTo);
   }
 }

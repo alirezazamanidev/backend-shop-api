@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from '../user/entities/user.entity';
 import { Repository } from 'typeorm';
-import { CheckOtpDto, SendOtpDto } from './dtos/auth.dto';
+import { CheckOtpDto, RefreshTokenDto, SendOtpDto } from './dtos/auth.dto';
 import { RedisService } from '../redis/redis.service';
 import { randomInt } from 'crypto';
 import { TokenService } from './token.service';
@@ -66,5 +66,31 @@ export class AuthService {
       message: 'LoggedIn successFully',
       tokens,
     };
+  }
+
+  async refreshTokens(rtDto: RefreshTokenDto) {
+    let { refresh_token } = rtDto;
+    let { phone } = this.tokenService.verifyRt(refresh_token);
+
+    // Check if the refresh token is in Redis
+    const storedToken = await this.redisService.get(`rt_token:${phone}`);
+    if (!storedToken || storedToken !== refresh_token) {
+      throw new UnauthorizedException(
+        'Refresh token is invalid or has expired',
+      );
+    }
+    // generate new access and refresh tokens
+    let tokens = await this.tokenService.generateJWTTokens(phone);
+    // Invalidate the old refresh token
+    await this.redisService.del(`rt_token:${phone}`);
+
+    // Store the new refresh token in Redis
+    await this.redisService.set(
+      `rt:${phone}`,
+      tokens.refresh_token,
+      process.env.REFRESH_TOKEN_TIME_EXPIRED,
+    );
+
+    return tokens;
   }
 }
