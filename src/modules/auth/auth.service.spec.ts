@@ -18,6 +18,7 @@ describe('AuthService', () => {
   const mockTokenService = {};
   const mockRedisService = {
     get: jest.fn(),
+    set: jest.fn(),
   };
   const mockUser: Partial<UserEntity> = {
     id: 1,
@@ -71,8 +72,30 @@ describe('AuthService', () => {
       jest.spyOn(service, 'createOtpForUser').mockResolvedValue('1234');
       const result = await service.sendOtp(SendOtpDto);
       expect(result).toHaveProperty('code');
-      expect(mockUserRepository.findOneBy).toHaveBeenCalledWith({ phone: SendOtpDto.phone });
- 
+      expect(mockUserRepository.findOneBy).toHaveBeenCalledWith({
+        phone: SendOtpDto.phone,
+      });
+    });
+  });
+  describe('CreateOtpForUser', () => {
+    let phone = '09914275883';
+    it('should throw unauthrized exception if otp code not expired!', async () => {
+      mockRedisService.get.mockResolvedValue('12345');
+      await expect(service.createOtpForUser(phone)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockRedisService.get).toHaveBeenCalledWith(`otp:${phone}`);
+    });
+    it('should create a new otp and store it in redis if otp is expired!', async () => {
+      mockRedisService.get.mockResolvedValueOnce(null);
+      mockRedisService.set.mockResolvedValue('OK');
+      const result = await service.createOtpForUser(phone);
+      expect(result).toHaveLength(5);
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        `otp:${phone}`,
+        expect.any(String),
+        process.env.OTP_TIME_EXPIRED,
+      );
     });
   });
 });
