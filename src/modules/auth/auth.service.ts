@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from '../user/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -92,5 +96,19 @@ export class AuthService {
     );
 
     return tokens;
+  }
+  async getPaylodUser(phone: string) {
+    let user = await this.userRepository.findOne({
+      where: { phone },
+      select: {
+        id: true,
+        username: true,
+        fullname: true,
+        phone_verify: true,
+        created_at: true,
+      },
+    });
+    if (!user) throw new NotFoundException('user not founded!');
+    return user;
   }
 }

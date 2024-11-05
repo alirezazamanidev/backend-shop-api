@@ -7,7 +7,7 @@ export default function SwaggerConfig(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle(process.env.APP_NAME)
     .setContact('alireza', null, 'alirezazamanidev80@gmail.com')
-    .addSecurity('Authorization', SwaggerAuthConfig())
+    .addSecurity('authorization', SwaggerAuthConfig())
     .setVersion(process.env.API_VERSION)
     .build();
     const theme = new SwaggerTheme();
