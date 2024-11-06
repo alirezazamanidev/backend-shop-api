@@ -16,7 +16,7 @@ export const AppIntilizer = (app: NestExpressApplication) => {
   app.use(cookieParser());
   app.setGlobalPrefix('/api');
   // app.useGlobalInterceptors(new FileCleanupInterceptor());
-  app.useGlobalFilters(...getGlobalFilters(httpAdapter));
+  // app.useGlobalFilters(...getGlobalFilters(httpAdapter));
   app.useGlobalPipes(new ValidationPipeErorr());
   // swagger Init 
   SwaggerConfig(app);

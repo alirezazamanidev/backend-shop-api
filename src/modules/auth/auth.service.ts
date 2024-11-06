@@ -5,10 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from '../user/entities/user.entity';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { CheckOtpDto, RefreshTokenDto, SendOtpDto } from './dtos/auth.dto';
 import { RedisService } from '../redis/redis.service';
-import { randomInt } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import { TokenService } from './token.service';
 
 @Injectable()
@@ -18,23 +18,44 @@ export class AuthService {
     private readonly userRepository: Repository<UserEntity>,
     private readonly redisService: RedisService,
     private readonly tokenService: TokenService,
+    private readonly dataSourse: DataSource,
   ) {}
 
   async sendOtp(userDto: SendOtpDto) {
-    let { phone } = userDto;
+    let { phone, referrer_code } = userDto;
 
-    let user = await this.userRepository.findOneBy({ phone });
-    if (!user) {
-      user = this.userRepository.create({ phone });
-      user = await this.userRepository.save(user);
-    }
+    return await this.dataSourse.transaction(async (manager) => {
+      let user = await manager.findOneBy(UserEntity, { phone });
+      if (!user) {
+        user = manager.create(UserEntity, { phone, invite_code: randomUUID() });
+        user = await manager.save(UserEntity, user);
 
-    let otpCode = await this.createOtpForUser(phone);
+        if (referrer_code) {
+          await this.setReferrerUser(referrer_code, user, manager);
+        }
+      }
+      let otpCode = await this.createOtpForUser(phone);
 
-    return {
-      message: 'Sent otp Code successFully',
-      code: otpCode,
-    };
+      return {
+        message: 'Sent otp Code successFully',
+        code: otpCode,
+      };
+    });
+  }
+  async setReferrerUser(
+    referrer_code: string,
+    user: UserEntity,
+    manager: EntityManager,
+  ) {
+    let referrer = await manager.findOne(UserEntity, {
+      where: { invite_code: referrer_code },
+      relations: { invitedUsers: true, referrer: true },
+    });
+    if (!referrer) throw new NotFoundException('referrer_code not founded!');
+    referrer.invitedUsers.push(user);
+    user.referrerId = referrer.id;
+    await manager.save(UserEntity, user);
+    await manager.save(UserEntity, referrer);
   }
 
   async createOtpForUser(phone: string) {
@@ -101,6 +122,7 @@ export class AuthService {
     let user = await this.userRepository.findOne({
       where: { phone },
       select: {
+        
         id: true,
         username: true,
         fullname: true,

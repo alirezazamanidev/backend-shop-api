@@ -1,10 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-    IsJWT,
+  IsJWT,
   IsMobilePhone,
   IsNotEmpty,
   IsNumberString,
+  IsOptional,
   IsString,
+  IsUUID,
   Length,
 } from 'class-validator';
 
@@ -13,6 +15,10 @@ export class SendOtpDto {
   @IsNotEmpty()
   @IsMobilePhone('fa-IR')
   phone: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  referrer_code?: string;
 }
 export class CheckOtpDto {
   @ApiProperty()
@@ -26,9 +32,9 @@ export class CheckOtpDto {
   code: string;
 }
 export class RefreshTokenDto {
-    @ApiProperty()
-    @IsNotEmpty()
-    @IsString()
-    @IsJWT()
-    refresh_token:string
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  @IsJWT()
+  refresh_token: string;
 }

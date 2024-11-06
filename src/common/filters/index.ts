@@ -6,6 +6,6 @@ import { AllExceptionFilter } from './all-exception.filter';
 export const getGlobalFilters = (
   httpAdapter: HttpAdapterHost,
 ): ExceptionFilter<any>[] => [
-    new ValidationFilter(),
   new AllExceptionFilter(httpAdapter),
+  new ValidationFilter(),
 ];
