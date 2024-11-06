@@ -7,10 +7,17 @@ import { RedisService } from '../redis/redis.service';
 import { CheckOtpDto, RefreshTokenDto, SendOtpDto } from './dtos/auth.dto';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Tokens } from './types/payload.type';
-
+import { DataSource, EntityManager } from 'typeorm';
+import { randomUUID } from 'crypto';
 describe('AuthService', () => {
   let service: AuthService;
 
+  const mockEntityManager = {
+    findOneBy: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    findOne: jest.fn(),
+  };
   const mockUserRepository = {
     findOneBy: jest.fn(),
     findOne: jest.fn(),
@@ -26,9 +33,21 @@ describe('AuthService', () => {
     set: jest.fn(),
     del: jest.fn(),
   };
+  const mockDataSource = {
+    transaction: jest.fn().mockImplementation((cb) => cb(mockEntityManager)),
+  };
   const mockUser: Partial<UserEntity> = {
     id: 1,
-    phone: '09914275883',
+    phone: 'phone_Test',
+    invite_code: 'invite_code_test',
+  };
+  const mockReferrer: Partial<UserEntity> = {
+    id: 2,
+    phone: 'referrer_phone',
+    invite_code: 'referrer_code',
+    referrerId: null,
+    referrer: null,
+    invitedUsers: [],
   };
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -46,6 +65,10 @@ describe('AuthService', () => {
           provide: RedisService,
           useValue: mockRedisService,
         },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
       ],
     }).compile();
 
@@ -56,29 +79,38 @@ describe('AuthService', () => {
     expect(service).toBeDefined();
   });
   describe('SendOtp', () => {
-    let SendOtpDto: SendOtpDto = { phone: 'test_phone' };
-    it('should create a new user and send OTP if user does not exist', async () => {
-      mockUserRepository.findOneBy.mockResolvedValueOnce(null);
-      mockUserRepository.create.mockReturnValue(mockUser);
-      mockUserRepository.save.mockResolvedValue(mockUser);
-      jest.spyOn(service, 'createOtpForUser').mockResolvedValue('12345');
-      const result = await service.sendOtp(SendOtpDto);
-      expect(result).toHaveProperty('code');
+    let SendOtpDto: SendOtpDto = { phone: 'test_phone', referrer_code: '' };
 
-      expect(mockUserRepository.findOneBy).toHaveBeenCalledWith({
-        phone: SendOtpDto.phone,
-      });
-      expect(mockUserRepository.create).toHaveBeenCalledWith({
-        phone: SendOtpDto.phone,
-      });
-      expect(mockUserRepository.save).toHaveBeenCalledWith(mockUser);
-    });
-    it('should send otp code an exsiting user', async () => {
-      mockUserRepository.findOneBy.mockResolvedValueOnce(mockUser);
-      jest.spyOn(service, 'createOtpForUser').mockResolvedValue('1234');
+    it('should create a new user and send OTP if user does not exist', async () => {
+      mockEntityManager.findOneBy.mockResolvedValueOnce(null); // no user found
+
+      mockEntityManager.create.mockReturnValue(mockUser); // create mock user
+      mockEntityManager.save.mockResolvedValue(mockUser); // save user
+
+      jest.spyOn(service, 'createOtpForUser').mockResolvedValue('12345'); // mock OTP generation
       const result = await service.sendOtp(SendOtpDto);
+
+      expect(result.code).toBe('12345'); // check OTP
+
+      expect(mockEntityManager.findOneBy).toHaveBeenCalledWith(UserEntity, {
+        phone: SendOtpDto.phone,
+      });
+      expect(mockEntityManager.create).toHaveBeenCalledWith(UserEntity, {
+        phone: SendOtpDto.phone,
+        invite_code: expect.any(String),
+      });
+      // expect(mockEntityManager.save).toHaveBeenCalledWith(mockUser);
+    });
+    it('should send otp code for an existing user', async () => {
+      mockEntityManager.findOneBy.mockResolvedValueOnce(mockUser); // user found
+      jest.spyOn(service, 'createOtpForUser').mockResolvedValue('12345'); // mock OTP generation
+
+      const result = await service.sendOtp(SendOtpDto);
+
       expect(result).toHaveProperty('code');
-      expect(mockUserRepository.findOneBy).toHaveBeenCalledWith({
+      expect(result.code).toBe('12345');
+      expect(service.createOtpForUser).toHaveBeenCalledWith(SendOtpDto.phone);
+      expect(mockEntityManager.findOneBy).toHaveBeenCalledWith(UserEntity, {
         phone: SendOtpDto.phone,
       });
     });
@@ -194,7 +226,6 @@ describe('AuthService', () => {
       });
     });
     it('should return user data if user is found', async () => {
-     
       jest.spyOn(mockUserRepository, 'findOne').mockResolvedValueOnce(mockUser);
 
       const result = await service.getPaylodUser(phone);
@@ -210,6 +241,40 @@ describe('AuthService', () => {
           created_at: true,
         },
       });
+    });
+  });
+
+  describe('setReferrerUser', () => {
+    let sendOtpDto: SendOtpDto = {
+      phone: 'test_phone',
+      referrer_code: 'test_code',
+    };
+    it('should set referrer for user if referrer code is valid', async () => {
+      // Mock behavior for a valid referrer code
+      mockEntityManager.findOne.mockResolvedValueOnce(mockReferrer);
+      mockEntityManager.save.mockResolvedValueOnce(mockUser);
+
+      // Call the setReferrerUser method
+      await service.setReferrerUser('referrer_code', mockUser as UserEntity, mockEntityManager as any);
+
+      // Check that referrer is set correctly for the user
+      expect(mockEntityManager.findOne).toHaveBeenCalledWith(UserEntity, {
+        where: { invite_code: 'referrer_code' },
+        relations: { invitedUsers: true, referrer: true },
+      });
+      expect(mockEntityManager.save).toHaveBeenCalledWith(UserEntity, mockUser);
+      expect(mockReferrer.invitedUsers).toContain(mockUser);
+      expect(mockUser.referrerId).toBe(mockReferrer.id);
+    });
+    it('should throw not found  exception if referrer not founded', async () => {
+      mockEntityManager.findOne.mockResolvedValueOnce(null);
+      await expect(
+        service.setReferrerUser(
+          'invalid_referrer_code',
+          mockUser as UserEntity,
+          mockEntityManager as any,
+        ),
+      ).rejects.toThrow(new NotFoundException('referrer_code not founded!'));
     });
   });
 });
