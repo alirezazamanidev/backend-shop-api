@@ -4,6 +4,7 @@ import {
   FileTypeValidator,
   HttpCode,
   HttpStatus,
+  MaxFileSizeValidator,
   ParseFilePipe,
   Post,
   UploadedFile,
@@ -18,9 +19,7 @@ import { UploadFileS3 } from 'src/common/interceptors';
 @ApiTags('Categoery')
 @Controller('category')
 export class CategoryController {
-  constructor(
-    private readonly categoryService: CategoryService,
-  ) {}
+  constructor(private readonly categoryService: CategoryService) {}
 
   @ApiOperation({ summary: 'create new category' })
   @HttpCode(HttpStatus.CREATED)
@@ -32,7 +31,10 @@ export class CategoryController {
     @UploadedFile(
       new ParseFilePipe({
         fileIsRequired: false,
-        validators: [new FileTypeValidator({ fileType: 'image/png' })],
+        validators: [
+          new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
+          new MaxFileSizeValidator({ maxSize: 2 * 1024 * 1024 }),
+        ],
       }),
     )
     image: Express.Multer.File,

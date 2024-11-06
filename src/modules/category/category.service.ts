@@ -36,20 +36,22 @@ export class CategoryService {
     return await this.dataSourse.transaction(async (manager) => {
       const newCategory = await manager.save(CategoryEntity, createObject);
 
-      // uploaad images
-      const { Url, key } = await this.s3Service.upload(
-        image,
-        'category/images',
-      );
-      await manager.insert(CategoryImageEntity, {
-        categoryId: newCategory.id,
-        fieldname: image.fieldname,
-        originalname: image.originalname,
-        size: image.size,
-        mimetype: image.mimetype,
-        path: Url,
-        key: key,
-      });
+      if (image) {
+        // uploaad images
+        const { Url, key } = await this.s3Service.upload(
+          image,
+          'category/images',
+        );
+        await manager.insert(CategoryImageEntity, {
+          categoryId: newCategory.id,
+          fieldname: image.fieldname,
+          originalname: image.originalname,
+          size: image.size,
+          mimetype: image.mimetype,
+          path: Url,
+          key: key,
+        });
+      }
       return {
         message: 'created',
         category_id: newCategory.id,
