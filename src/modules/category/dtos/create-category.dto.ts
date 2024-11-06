@@ -5,11 +5,12 @@ import { IsNotEmpty, IsNumberString, IsOptional, IsString } from "class-validato
 export class CreateCategoryDto {
     @ApiProperty()
     @IsNotEmpty()
-    @IsString()
     name:string
-
     @ApiPropertyOptional()
     @IsOptional()
     @IsNumberString({})
     parentId?: number;
+    @ApiPropertyOptional({type:'string',format:'binary'})
+    @IsOptional()
+    image:Express.Multer.File
 }

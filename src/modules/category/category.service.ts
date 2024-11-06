@@ -5,18 +5,22 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CategoryEntity } from './entities/category.entity';
-import { DeepPartial, Repository } from 'typeorm';
+import { DataSource, DeepPartial, Repository } from 'typeorm';
 import { CreateCategoryDto } from './dtos/create-category.dto';
 import slugify from 'slugify';
+import { S3Service } from 'src/app/plugins/s3.service';
+import { CategoryImageEntity } from './entities/category-image.entity';
 
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectRepository(CategoryEntity)
     private readonly categoryRepository: Repository<CategoryEntity>,
+    private s3Service: S3Service,
+    private readonly dataSourse: DataSource,
   ) {}
 
-  async create(dto: CreateCategoryDto) {
+  async create(dto: CreateCategoryDto, image: Express.Multer.File) {
     const { name, parentId } = dto;
 
     let createObject: DeepPartial<CategoryEntity> = {};
@@ -29,13 +33,28 @@ export class CategoryService {
     if (parentId) {
       createObject['parent'] = await this.findOneById(parentId);
     }
+    return await this.dataSourse.transaction(async (manager) => {
+      const newCategory = await manager.save(CategoryEntity, createObject);
 
-    const newCategory = await this.categoryRepository.save(createObject);
-
-    return {
-      message: 'created',
-      category_id: newCategory.id,
-    };
+      // uploaad images
+      const { Url, key } = await this.s3Service.upload(
+        image,
+        'category/images',
+      );
+      await manager.insert(CategoryImageEntity, {
+        categoryId: newCategory.id,
+        fieldname: image.fieldname,
+        originalname: image.originalname,
+        size: image.size,
+        mimetype: image.mimetype,
+        path: Url,
+        key: key,
+      });
+      return {
+        message: 'created',
+        category_id: newCategory.id,
+      };
+    });
   }
   async findOneById(id: number) {
     const category = await this.categoryRepository.findOneBy({ id });
