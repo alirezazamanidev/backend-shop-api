@@ -1,6 +1,6 @@
 import './configs/env.config'
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { AppModule } from './modules/app.module';
 import { AppIntilizer } from './app';
 import { NestExpressApplication } from '@nestjs/platform-express';
 

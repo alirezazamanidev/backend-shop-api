@@ -6,6 +6,9 @@ declare namespace NodeJS {
     APP_PORT: number;
     API_VERSION: string;
     OTP_TIME_EXPIRED: number;
+    // Admin
+    ADMIN_USERNAME: string;
+    ADMIN_PASWORD: string;
     // Database
     DB_POSTGRES_HOST: string;
     DB_POSTGRES_PORT: number;
