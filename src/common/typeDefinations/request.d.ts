@@ -1,11 +1,9 @@
-import { IAdmin, IUser } from '../interfaces';
+import { IUser } from "../interfaces";
+import { IAdmin } from "../interfaces";
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: IUser;
-      admin: IAdmin;
-    }
+declare module 'express-session' {
+  interface SessionData {
+    admin?:IAdmin
   }
 }
 
